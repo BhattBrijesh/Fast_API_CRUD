@@ -1,5 +1,5 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict
@@ -31,7 +31,8 @@ class BookRead(BookCreate):
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+    # Create missing tables before the app starts serving requests.
     Base.metadata.create_all(bind=engine)
     yield
 
@@ -67,6 +68,7 @@ def update_book(book_id: int, book_data: BookUpdate, db: Session = Depends(get_d
     if book is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
 
+    # Apply only supplied fields so omitted values remain unchanged.
     changes = book_data.model_dump(exclude_unset=True)
     if any(changes[field] is None for field in ("title", "author") if field in changes):
         raise HTTPException(
